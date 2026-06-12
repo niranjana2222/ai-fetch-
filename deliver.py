@@ -15,7 +15,7 @@ def send_digest(report_md: str):
     resend.Emails.send({
         "from":    DIGEST_FROM,
         "to":      DIGEST_EMAIL,
-        "subject": f"🤖 AI Research Digest — {date.today()}",
+        "subject": f"AI Research Digest — {date.today()}",
         "html":    html
     })
     print(f"[Deliver] Sent to {DIGEST_EMAIL}")

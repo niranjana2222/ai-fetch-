@@ -11,6 +11,8 @@ class DigestState(TypedDict):
     categorized_items: List[Dict[str, Any]]
     enriched_items:    List[Dict[str, Any]]
     report_markdown:   str
+    report_sections:   List[Dict[str, Any]]
+    report_meta:       Dict[str, Any]
 
 def build_graph():
     g = StateGraph(DigestState)

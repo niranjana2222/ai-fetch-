@@ -2,6 +2,7 @@
 
 Run:  .venv/bin/python server.py   →  http://127.0.0.1:5050
 """
+import json
 import threading
 import traceback
 from datetime import datetime
@@ -31,8 +32,8 @@ _state = {
 }
 
 
-def _latest_digest_path():
-    files = sorted(DIGEST_DIR.glob("digest-*.md"))
+def _latest_digest_path(suffix="json"):
+    files = sorted(DIGEST_DIR.glob(f"digest-*.{suffix}"))
     return files[-1] if files else None
 
 
@@ -41,7 +42,7 @@ def _run_pipeline():
     initial = {"raw_items": [], "categorized_items": [],
                "enriched_items": [], "report_markdown": ""}
     try:
-        report_md = ""
+        report_md, sections, meta = "", [], {}
         for chunk in graph.stream(initial):
             for node, out in chunk.items():
                 with _lock:
@@ -56,9 +57,13 @@ def _run_pipeline():
                         _state["counts"]["summarized"] = len(out.get("enriched_items", []))
                 if node == "report":
                     report_md = out.get("report_markdown", "")
+                    sections = out.get("report_sections", [])
+                    meta = out.get("report_meta", {})
 
         stamp = datetime.now().strftime("%Y-%m-%d-%H%M")
         (DIGEST_DIR / f"digest-{stamp}.md").write_text(report_md)
+        (DIGEST_DIR / f"digest-{stamp}.json").write_text(
+            json.dumps({"sections": sections, "meta": meta}))
         with _lock:
             _state["finished_at"] = datetime.now().isoformat(timespec="seconds")
     except Exception:
@@ -95,13 +100,19 @@ def status():
 
 @app.get("/api/report")
 def report():
-    path = _latest_digest_path()
+    path = _latest_digest_path("json")
+    if path:
+        data = json.loads(path.read_text())
+        generated = datetime.fromtimestamp(path.stat().st_mtime).strftime("%B %d, %Y · %H:%M")
+        return jsonify({**data, "generated_at": generated, "file": path.name})
+
+    # legacy markdown-only editions
+    path = _latest_digest_path("md")
     if not path:
-        return jsonify({"html": None, "generated_at": None})
-    raw = path.read_text()
-    html = md_lib.markdown(raw, extensions=["tables", "toc"])
+        return jsonify({"sections": None, "html": None, "generated_at": None})
+    html = md_lib.markdown(path.read_text(), extensions=["tables", "toc"])
     generated = datetime.fromtimestamp(path.stat().st_mtime).strftime("%B %d, %Y · %H:%M")
-    return jsonify({"html": html, "generated_at": generated, "file": path.name})
+    return jsonify({"sections": None, "html": html, "generated_at": generated, "file": path.name})
 
 
 if __name__ == "__main__":
