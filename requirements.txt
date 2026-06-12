@@ -1,0 +1,9 @@
+langgraph>=0.2
+arxiv
+feedparser
+requests
+markdown
+resend
+python-dotenv
+schedule
+flask
